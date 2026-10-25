@@ -1,0 +1,562 @@
+<title>SmartFind מפת הקליינט</title>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700&family=Assistant:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column with wide diagram panels; screens as a filterable grid of spec cards */
+:root{
+  --paper:#f3f5f9; --surface:#ffffff; --ink:#18202f; --muted:#5d667a; --line:#d9dee8;
+  --accent:#2b59c3; --accent-soft:#e3eafb;
+  --ok:#25804f; --ok-soft:#ddf1e6; --wait:#a86e00; --wait-soft:#fbefd6;
+  --bad:#b8382f; --bad-soft:#f8e1df; --done:#5b6478; --done-soft:#e7e9ef;
+  --user:#2b59c3; --user-soft:#e3eafb; --admin:#7a3db8; --admin-soft:#efe4fa; --srv:#4b5568; --srv-soft:#eceef3;
+  --f-display:"Rubik","Assistant",system-ui,sans-serif;
+  --f-body:"Assistant",system-ui,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --paper:#11151d; --surface:#1a2029; --ink:#e7ebf2; --muted:#9aa3b5; --line:#2d3542;
+    --accent:#7d9ef0; --accent-soft:#1f2a44;
+    --ok:#5fc68e; --ok-soft:#173327; --wait:#e8b54a; --wait-soft:#3a2d12; --bad:#f08a80; --bad-soft:#3d1d1a; --done:#a3abbc; --done-soft:#262c37;
+    --user:#7d9ef0; --user-soft:#1f2a44; --admin:#c49af0; --admin-soft:#2e2140; --srv:#a3abbc; --srv-soft:#242a35;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#11151d; --surface:#1a2029; --ink:#e7ebf2; --muted:#9aa3b5; --line:#2d3542;
+  --accent:#7d9ef0; --accent-soft:#1f2a44;
+  --ok:#5fc68e; --ok-soft:#173327; --wait:#e8b54a; --wait-soft:#3a2d12; --bad:#f08a80; --bad-soft:#3d1d1a; --done:#a3abbc; --done-soft:#262c37;
+  --user:#7d9ef0; --user-soft:#1f2a44; --admin:#c49af0; --admin-soft:#2e2140; --srv:#a3abbc; --srv-soft:#242a35;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16.5px;line-height:1.6;margin:0;padding-inline:20px;padding-block:28px 64px}
+.wrap{max-width:1080px;margin-inline:auto;display:flex;flex-direction:column;gap:56px}
+h1,h2,h3{font-family:var(--f-display);line-height:1.2;text-wrap:balance;margin:0}
+h1{font-size:2.3rem}
+h2{font-size:1.55rem}
+h3{font-size:1.1rem}
+p{margin:0;max-width:68ch}
+code,.mono{font-family:var(--f-mono);font-size:.84em;direction:ltr;unicode-bidi:isolate}
+code{background:var(--srv-soft);padding:1px 5px;border-radius:4px}
+a{color:var(--accent)}
+section{display:flex;flex-direction:column;gap:18px}
+.eyebrow{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+header.top{display:flex;flex-direction:column;gap:14px}
+.facts{display:flex;flex-wrap:wrap;gap:10px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:2px}
+.fact b{font-size:.75rem;color:var(--muted);font-weight:600}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px}
+nav.toc a{text-decoration:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:4px 12px;border-radius:999px;font-size:.92rem}
+nav.toc a:hover,nav.toc a:focus-visible{border-color:var(--accent);color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* role tags */
+.tag{display:inline-block;font-size:.75rem;font-weight:700;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.tag.user{background:var(--user-soft);color:var(--user)}
+.tag.admin{background:var(--admin-soft);color:var(--admin)}
+.tag.srv{background:var(--srv-soft);color:var(--srv)}
+.tag.any{background:var(--done-soft);color:var(--done)}
+
+/* status pills */
+.st{display:inline-block;font-family:var(--f-mono);font-size:.78rem;font-weight:600;padding:2px 9px;border-radius:5px;direction:ltr}
+.st.ok{background:var(--ok-soft);color:var(--ok)}
+.st.wait{background:var(--wait-soft);color:var(--wait)}
+.st.bad{background:var(--bad-soft);color:var(--bad)}
+.st.done{background:var(--done-soft);color:var(--done)}
+
+/* swimlane diagram */
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.lanes{display:grid;grid-template-columns:2.2rem repeat(3,1fr);min-width:720px;position:relative}
+.lane-h{padding:12px;font-family:var(--f-display);font-weight:700;text-align:center;border-bottom:1px solid var(--line);position:sticky;top:0}
+.lane-h.user{color:var(--user);background:var(--user-soft)}
+.lane-h.srv{color:var(--srv);background:var(--srv-soft)}
+.lane-h.admin{color:var(--admin);background:var(--admin-soft)}
+.num{display:flex;align-items:flex-start;justify-content:center;padding-top:16px;font-family:var(--f-mono);font-weight:600;color:var(--muted);font-size:.85rem;border-bottom:1px dashed var(--line)}
+.cell{padding:10px;border-bottom:1px dashed var(--line);border-inline-start:1px solid var(--line);min-height:20px}
+.step{border-radius:8px;padding:9px 11px;font-size:.93rem;display:flex;flex-direction:column;gap:4px}
+.step.user{background:var(--user-soft);border:1px solid color-mix(in srgb,var(--user) 35%,transparent)}
+.step.srv{background:var(--srv-soft);border:1px solid color-mix(in srgb,var(--srv) 35%,transparent)}
+.step.admin{background:var(--admin-soft);border:1px solid color-mix(in srgb,var(--admin) 35%,transparent)}
+.step .api{font-family:var(--f-mono);font-size:.76rem;color:var(--muted);direction:ltr;text-align:left}
+.arrow{color:var(--muted);font-size:.85rem}
+
+/* state machines */
+.machines{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.machine{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.flowrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;direction:ltr;justify-content:flex-end}
+.flowrow .to{color:var(--muted);font-family:var(--f-mono);font-size:.8rem}
+.machine p{font-size:.92rem;color:var(--muted)}
+
+/* sitemap */
+.sitemap{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.tree{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.tree ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.tree ul ul{padding-inline-start:18px;border-inline-start:2px solid var(--line);margin-top:6px}
+.tree li .r{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);direction:ltr;unicode-bidi:isolate;margin-inline-start:6px}
+
+/* screen cards */
+.filter{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filter button{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:5px 14px;border-radius:999px;cursor:pointer}
+.filter button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.screens{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.screen{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--srv)}
+.screen[data-role="user"]{border-top-color:var(--user)}
+.screen[data-role="admin"]{border-top-color:var(--admin)}
+.screen .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.screen .route{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);direction:ltr}
+.screen dl{margin:0;display:flex;flex-direction:column;gap:8px}
+.screen dt{font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.screen dd{margin:0;font-size:.93rem}
+.screen dd ul{margin:0;padding-inline-start:18px;display:flex;flex-direction:column;gap:2px}
+.calls{display:flex;flex-direction:column;gap:4px;direction:ltr}
+.call{font-family:var(--f-mono);font-size:.76rem;background:var(--srv-soft);border-radius:5px;padding:3px 7px;text-align:left;word-break:break-word}
+.call b{color:var(--accent)}
+
+/* tables & code */
+table{border-collapse:collapse;width:100%;font-size:.92rem;background:var(--surface)}
+th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:start;vertical-align:top}
+th{font-size:.78rem;letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
+td.m{font-family:var(--f-mono);font-size:.8rem;direction:ltr;text-align:left;white-space:nowrap}
+pre{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;direction:ltr;text-align:left;font-family:var(--f-mono);font-size:.8rem;line-height:1.55;color:var(--ink)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.note{background:var(--accent-soft);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.note ul{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:4px}
+@media (prefers-reduced-motion:no-preference){.filter button{transition:background .15s}}
+</style>
+
+<div class="wrap" dir="rtl" lang="he">
+
+<header class="top">
+  <span class="eyebrow">אפיון קליינט · React + TypeScript</span>
+  <h1>SmartFind – מפת הקליינט</h1>
+  <p>התרשים של המערכת מנקודת המבט של הקליינט: מי עושה מה, באיזה סדר, אילו מסכים צריך, ואיזו קריאה לשרת כל מסך עושה. הכול מבוסס על השרת שכבר בנוי ועובד.</p>
+  <div class="facts">
+    <div class="fact"><b>כתובת API מקומית</b><span class="mono">http://localhost:3000/api</span></div>
+    <div class="fact"><b>Swagger</b><span class="mono">http://localhost:3000/api/docs</span></div>
+    <div class="fact"><b>כותרת בכל בקשה</b><span class="mono">Authorization: Bearer &lt;token&gt;</span></div>
+    <div class="fact"><b>פרטי כניסה לבדיקה</b><span>בקובץ <code>LOCAL_CREDENTIALS.md</code></span></div>
+  </div>
+  <nav class="toc" aria-label="ניווט">
+    <a href="#story">1. הזרימה המלאה</a>
+    <a href="#states">2. סטטוסים</a>
+    <a href="#sitemap">3. מפת אתר</a>
+    <a href="#screens">4. אפיון מסכים</a>
+    <a href="#rules">5. כללי אפליקציה</a>
+    <a href="#types">6. טיפוסי TypeScript</a>
+    <a href="#errors">7. שגיאות</a>
+  </nav>
+</header>
+
+<!-- 1. Swimlane -->
+<section id="story">
+  <span class="eyebrow">תרשים 1</span>
+  <h2>הזרימה המלאה: מאבדה ועד החזרה</h2>
+  <p>שלושה מסלולים: המשתמש, השרת והמנהל. קוראים מלמעלה למטה. כל צעד מראה את הקריאה ל-API שמאחוריו.</p>
+  <div class="scroll">
+    <div class="lanes" role="table" aria-label="זרימת המערכת">
+      <div></div>
+      <div class="lane-h user">משתמש (User)</div>
+      <div class="lane-h srv">שרת</div>
+      <div class="lane-h admin">מנהל (Admin)</div>
+
+      <div class="num">1</div>
+      <div class="cell"><div class="step user"><b>נרשם / מתחבר</b><span class="api">POST /auth/register · /auth/login</span></div></div>
+      <div class="cell"><div class="step srv"><b>מחזיר token + user</b>הקליינט שומר את שניהם</div></div>
+      <div class="cell"><div class="step admin"><b>מתחבר</b> עם חשבון האדמין<span class="api">POST /auth/login</span></div></div>
+
+      <div class="num">2</div>
+      <div class="cell"></div>
+      <div class="cell"></div>
+      <div class="cell"><div class="step admin"><b>רושם פריט שנמצא</b>כולל שאלת אימות ותשובה סודית<span class="api">POST /found-items</span></div></div>
+
+      <div class="num">3</div>
+      <div class="cell"><div class="step user"><b>מדווח על אבדה</b>כותרת, תיאור, קטגוריה, צבע, מיקום, תאריך<span class="api">POST /lost-reports</span></div></div>
+      <div class="cell"><div class="step srv">שומר את הדיווח בסטטוס <span class="st ok">Open</span></div></div>
+      <div class="cell"></div>
+
+      <div class="num">4</div>
+      <div class="cell"><div class="step user"><b>צופה בהתאמות</b> לדיווח שלו<span class="api">GET /lost-reports/:id/matches</span></div></div>
+      <div class="cell"><div class="step srv"><b>מחשב ציון</b> מול כל פריט <span class="st ok">Available</span>: קטגוריה 40, צבע 20, מיקום 20. מחזיר רק 60 ומעלה</div></div>
+      <div class="cell"></div>
+
+      <div class="num">5</div>
+      <div class="cell"><div class="step user"><b>לוחץ "זה שלי"</b> ועונה על שאלת האימות<span class="api">POST /ownership-requests</span></div></div>
+      <div class="cell"><div class="step srv">בודק: הדיווח שלו ו-Open, הפריט Available, אין בקשה ממתינה כפולה. יוצר בקשה <span class="st wait">Pending</span></div></div>
+      <div class="cell"></div>
+
+      <div class="num">6</div>
+      <div class="cell"></div>
+      <div class="cell"></div>
+      <div class="cell"><div class="step admin"><b>פותח בקשות ממתינות</b> ומשווה את תשובת המשתמש לתשובה הנכונה<span class="api">GET /ownership-requests?status=Pending</span></div></div>
+
+      <div class="num">7א</div>
+      <div class="cell"></div>
+      <div class="cell"><div class="step srv">בטרנזקציה אחת: בקשה <span class="st ok">Approved</span>, פריט ודיווח <span class="st done">Returned</span>, שאר הבקשות על הפריט <span class="st bad">Rejected</span></div></div>
+      <div class="cell"><div class="step admin"><b>מאשר</b><span class="api">PATCH /ownership-requests/:id/approve</span></div></div>
+
+      <div class="num">7ב</div>
+      <div class="cell"></div>
+      <div class="cell"><div class="step srv">הבקשה עוברת ל-<span class="st bad">Rejected</span> עם הסיבה. הדיווח נשאר Open</div></div>
+      <div class="cell"><div class="step admin"><b>או דוחה</b> עם סיבה (5 תווים לפחות)<span class="api">PATCH /ownership-requests/:id/reject</span></div></div>
+
+      <div class="num">8</div>
+      <div class="cell"><div class="step user"><b>רואה את התוצאה</b> ב"הבקשות שלי": אושר, או נדחה עם הסיבה<span class="api">GET /ownership-requests</span></div></div>
+      <div class="cell"></div>
+      <div class="cell"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. States -->
+<section id="states">
+  <span class="eyebrow">תרשים 2</span>
+  <h2>סטטוסים ומה הם מאפשרים בממשק</h2>
+  <p>הקליינט לעולם לא שולח סטטוס. הוא רק קורא אותו ומחליט אילו כפתורים להציג.</p>
+  <div class="machines">
+    <div class="machine">
+      <h3>דיווח אבדה (LostReport)</h3>
+      <div class="flowrow"><span class="st ok">Open</span><span class="to">— approve →</span><span class="st done">Returned</span></div>
+      <p><b>Open:</b> מציגים עריכה, מחיקה, התאמות, "זה שלי".<br><b>Returned:</b> קריאה בלבד. התאמות ריקות.</p>
+    </div>
+    <div class="machine">
+      <h3>פריט שנמצא (FoundItem)</h3>
+      <div class="flowrow"><span class="st ok">Available</span><span class="to">— approve →</span><span class="st done">Returned</span></div>
+      <p>משתמש רגיל רואה רק Available. לאדמין: פריט Returned אי אפשר למחוק, אז מסתירים את כפתור המחיקה.</p>
+    </div>
+    <div class="machine">
+      <h3>בקשת בעלות (OwnershipRequest)</h3>
+      <div class="flowrow"><span class="st wait">Pending</span><span class="to">→</span><span class="st ok">Approved</span><span class="to">/</span><span class="st bad">Rejected</span></div>
+      <p>רק בקשה Pending מקבלת אצל האדמין כפתורי אישור ודחייה. ב-Rejected מציגים את <code>rejectionReason</code>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Sitemap -->
+<section id="sitemap">
+  <span class="eyebrow">תרשים 3</span>
+  <h2>מפת אתר מוצעת</h2>
+  <p>הנתיבים הם הצעה. אפשר לשנות שמות, העיקר שכל מסך מוגן לפי התפקיד.</p>
+  <div class="sitemap">
+    <div class="tree">
+      <h3><span class="tag any">ציבורי</span></h3>
+      <ul>
+        <li>התחברות <span class="r">/login</span></li>
+        <li>הרשמה <span class="r">/register</span></li>
+      </ul>
+    </div>
+    <div class="tree">
+      <h3><span class="tag user">User</span></h3>
+      <ul>
+        <li>הדיווחים שלי <span class="r">/my-reports</span>
+          <ul>
+            <li>דיווח חדש <span class="r">/my-reports/new</span></li>
+            <li>פרטי דיווח + התאמות <span class="r">/my-reports/:id</span>
+              <ul><li>עריכה <span class="r">/my-reports/:id/edit</span></li></ul>
+            </li>
+          </ul>
+        </li>
+        <li>חיפוש פריטים שנמצאו <span class="r">/found-items</span>
+          <ul><li>פרטי פריט + "זה שלי" <span class="r">/found-items/:id</span></li></ul>
+        </li>
+        <li>הבקשות שלי <span class="r">/my-requests</span></li>
+      </ul>
+    </div>
+    <div class="tree">
+      <h3><span class="tag admin">Admin</span></h3>
+      <ul>
+        <li>בקשות בעלות <span class="r">/admin/requests</span>
+          <ul><li>בדיקת בקשה <span class="r">/admin/requests/:id</span></li></ul>
+        </li>
+        <li>ניהול פריטים <span class="r">/admin/found-items</span>
+          <ul><li>פריט חדש / עריכה <span class="r">/admin/found-items/new · /:id/edit</span></li></ul>
+        </li>
+        <li>כל הדיווחים <span class="r">/admin/lost-reports</span></li>
+        <li>טבלאות עזר <span class="r">/admin/lookups</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 4. Screens -->
+<section id="screens">
+  <span class="eyebrow">אפיון</span>
+  <h2>אפיון מסכים</h2>
+  <p>לכל מסך: מה מציגים, אילו קריאות API הוא עושה, אילו כפתורים יש ומתי, ואילו שגיאות צריך לטפל בהן.</p>
+  <div class="filter" role="group" aria-label="סינון לפי תפקיד">
+    <button type="button" id="f-all" data-f="all" aria-pressed="true">הכול</button>
+    <button type="button" id="f-user" data-f="user" aria-pressed="false">User</button>
+    <button type="button" id="f-admin" data-f="admin" aria-pressed="false">Admin</button>
+  </div>
+
+  <div class="screens">
+
+    <article class="screen" data-role="any">
+      <div class="head"><h3>התחברות והרשמה</h3><span class="tag any">ציבורי</span></div>
+      <span class="route">/login · /register</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>טופס אימייל + סיסמה. בהרשמה גם שם מלא. סיסמה 8 תווים לפחות.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>POST</b> /auth/login {email,password}</span><span class="call"><b>POST</b> /auth/register {fullName,email,password}</span></dd>
+        <dt>אחרי הצלחה</dt><dd>שומרים <code>token</code> ו-<code>user</code>. מעבירים לפי <code>user.role</code>: User ל-/my-reports, Admin ל-/admin/requests.</dd>
+        <dt>שגיאות</dt><dd><ul><li>401: "אימייל או סיסמה שגויים"</li><li>409 בהרשמה: האימייל תפוס</li><li>429: יותר מדי ניסיונות, לנסות בעוד כמה דקות</li></ul></dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="user">
+      <div class="head"><h3>הדיווחים שלי</h3><span class="tag user">User</span></div>
+      <span class="route">/my-reports</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>רשימה: כותרת, קטגוריה, תאריך אבדה, סטטוס. סינון לפי סטטוס, מיון, עימוד.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /lost-reports?status=&amp;sortBy=lostDate&amp;order=desc&amp;page=1</span></dd>
+        <dt>כפתורים</dt><dd><ul><li>"דיווח חדש"</li><li>לחיצה על שורה: פרטי דיווח</li></ul></dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="user">
+      <div class="head"><h3>דיווח חדש / עריכה</h3><span class="tag user">User</span></div>
+      <span class="route">/my-reports/new · /:id/edit</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>כותרת, תיאור, 3 רשימות בחירה (קטגוריה, צבע, מיקום), תאריך אבדה.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /lookups</span><span class="call"><b>POST</b> /lost-reports</span><span class="call"><b>PUT</b> /lost-reports/:id (כל השדות)</span></dd>
+        <dt>שימו לב</dt><dd><ul><li>שולחים <code>categoryId</code> וכו' כמספרים, ואת התאריך כ-<code>"2026-10-01"</code></li><li>אסור לשלוח שדות נוספים (למשל id או status): השרת מחזיר 400</li><li>400: מציגים את <code>details</code> ליד השדה המתאים</li></ul></dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="user">
+      <div class="head"><h3>פרטי דיווח + התאמות</h3><span class="tag user">User</span></div>
+      <span class="route">/my-reports/:id</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>פרטי הדיווח, ומתחת רשימת התאמות: פריט, ציון (60–80), ותגיות של מה התאים לפי <code>breakdown</code>.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /lost-reports/:id</span><span class="call"><b>GET</b> /lost-reports/:id/matches</span><span class="call"><b>DELETE</b> /lost-reports/:id → 204</span></dd>
+        <dt>כפתורים לפי סטטוס</dt><dd><ul><li><span class="st ok">Open</span>: עריכה, מחיקה (עם אישור), "זה שלי" ליד כל התאמה</li><li><span class="st done">Returned</span>: אין כפתורים, רק "הפריט הוחזר"</li></ul></dd>
+        <dt>מצב ריק</dt><dd>"אין עדיין התאמות. נבדוק שוב כשיירשמו פריטים חדשים."</dd>
+        <dt>שגיאות</dt><dd>404: הדיווח לא קיים או לא שלך</dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="user">
+      <div class="head"><h3>חיפוש פריטים שנמצאו</h3><span class="tag user">User</span></div>
+      <span class="route">/found-items</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>תיבת חיפוש, סינון קטגוריה/צבע/מיקום, מיון לפי תאריך מציאה, עימוד. השרת מחזיר למשתמש רק פריטים Available.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /lookups</span><span class="call"><b>GET</b> /found-items?search=&amp;categoryId=&amp;colorId=&amp;locationId=&amp;sortBy=foundDate&amp;order=desc&amp;page=1&amp;pageSize=10</span></dd>
+        <dt>עימוד</dt><dd>מספר עמודים = <code>Math.ceil(total / pageSize)</code></dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="user">
+      <div class="head"><h3>פרטי פריט + "זה שלי"</h3><span class="tag user">User</span></div>
+      <span class="route">/found-items/:id</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>פרטי הפריט ואת <code>verificationQuestion</code>. התשובה הנכונה לא מגיעה לקליינט בכלל.</dd>
+        <dt>טופס הבקשה</dt><dd><ul><li>בחירת דיווח מתוך הדיווחים שלי בסטטוס Open</li><li>שדה תשובה לשאלה</li></ul></dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /found-items/:id</span><span class="call"><b>GET</b> /lost-reports?status=Open&amp;pageSize=100</span><span class="call"><b>POST</b> /ownership-requests {lostReportId,foundItemId,answer}</span></dd>
+        <dt>שגיאות</dt><dd><ul><li>409: כבר יש בקשה ממתינה על הפריט, או שהוא כבר הוחזר</li><li>אם אין לי דיווח Open: להציע ליצור דיווח קודם</li></ul></dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="user">
+      <div class="head"><h3>הבקשות שלי</h3><span class="tag user">User</span></div>
+      <span class="route">/my-requests</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>פריט, הדיווח שלי, התשובה ששלחתי, סטטוס, תאריך. סינון לפי סטטוס.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /ownership-requests?status=&amp;page=1</span></dd>
+        <dt>לפי סטטוס</dt><dd><ul><li><span class="st wait">Pending</span>: "ממתין לבדיקת מנהל"</li><li><span class="st ok">Approved</span>: "אושר. אפשר לאסוף את הפריט"</li><li><span class="st bad">Rejected</span>: מציגים <code>rejectionReason</code></li></ul></dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="admin">
+      <div class="head"><h3>בקשות בעלות</h3><span class="tag admin">Admin</span></div>
+      <span class="route">/admin/requests</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>כל הבקשות, ברירת מחדל Pending. שם המבקש, פריט, תאריך.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /ownership-requests?status=Pending&amp;order=asc</span></dd>
+        <dt>מומלץ</dt><dd>מסך הבית של האדמין, עם מונה של בקשות ממתינות (<code>total</code>).</dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="admin">
+      <div class="head"><h3>בדיקת בקשה</h3><span class="tag admin">Admin</span></div>
+      <span class="route">/admin/requests/:id</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>זה לצד זה: <code>verificationQuestion</code>, <code>answer</code> של המשתמש, <code>correctAnswer</code>. פרטי <code>user</code>, הדיווח והפריט.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /ownership-requests/:id</span><span class="call"><b>PATCH</b> /ownership-requests/:id/approve (בלי body)</span><span class="call"><b>PATCH</b> /ownership-requests/:id/reject {rejectionReason}</span></dd>
+        <dt>כפתורים</dt><dd>רק כש-Pending: "אישור" (עם אישור נוסף) ו"דחייה", שפותח שדה סיבה. הכפתור מושבת עד 5 תווים.</dd>
+        <dt>שגיאות</dt><dd>409: הבקשה כבר טופלה, או שהפריט כבר הוחזר. לרענן את המסך.</dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="admin">
+      <div class="head"><h3>ניהול פריטים שנמצאו</h3><span class="tag admin">Admin</span></div>
+      <span class="route">/admin/found-items</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>כמו החיפוש של המשתמש, ועוד סינון סטטוס ועמודת "תשובה נכונה" (<code>verificationAnswer</code>).</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /found-items?status=Available</span><span class="call"><b>DELETE</b> /found-items/:id → 204</span></dd>
+        <dt>כפתורים</dt><dd><ul><li>"פריט חדש"</li><li>עריכה</li><li>מחיקה: רק כש-Available. מוחקת גם את הבקשות על הפריט, אז כדאי לכתוב את זה בחלון האישור</li></ul></dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="admin">
+      <div class="head"><h3>פריט חדש / עריכה</h3><span class="tag admin">Admin</span></div>
+      <span class="route">/admin/found-items/new · /:id/edit</span>
+      <dl>
+        <dt>שדות</dt><dd>כותרת, תיאור, קטגוריה, צבע, מיקום, תאריך מציאה, שאלת אימות, תשובה נכונה. כולם חובה.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /lookups</span><span class="call"><b>POST</b> /found-items</span><span class="call"><b>PUT</b> /found-items/:id (כל השדות)</span></dd>
+        <dt>טיפ</dt><dd>להסביר ליד שאלת האימות: "שאלה שרק הבעלים יודע, ואין לה תשובה בתיאור הפריט".</dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="admin">
+      <div class="head"><h3>כל הדיווחים</h3><span class="tag admin">Admin</span></div>
+      <span class="route">/admin/lost-reports</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>כל דיווחי האבדה עם שם הבעלים (<code>owner.fullName</code>). אפשר לראות התאמות, לערוך ולמחוק.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /lost-reports?status=&amp;page=1</span><span class="call"><b>GET</b> /lost-reports/:id/matches</span><span class="call"><b>PUT</b> · <b>DELETE</b> /lost-reports/:id</span></dd>
+        <dt>שימו לב</dt><dd>לאדמין אין כפתור "דיווח חדש": השרת מחזיר 403.</dd>
+      </dl>
+    </article>
+
+    <article class="screen" data-role="admin">
+      <div class="head"><h3>טבלאות עזר</h3><span class="tag admin">Admin</span></div>
+      <span class="route">/admin/lookups</span>
+      <dl>
+        <dt>מה מציגים</dt><dd>שלוש רשימות: קטגוריות, צבעים, מיקומים. בכל אחת שדה הוספה וכפתור מחיקה.</dd>
+        <dt>קריאות</dt><dd class="calls"><span class="call"><b>GET</b> /lookups</span><span class="call"><b>POST</b> /lookups/categories {name}</span><span class="call"><b>DELETE</b> /lookups/colors/:id</span></dd>
+        <dt>שגיאות</dt><dd>409: הערך כבר קיים, או שהוא בשימוש ואי אפשר למחוק</dd>
+      </dl>
+    </article>
+
+  </div>
+</section>
+
+<!-- 5. App rules -->
+<section id="rules">
+  <span class="eyebrow">כללי אפליקציה</span>
+  <h2>מה כל האפליקציה צריכה לעשות</h2>
+  <div class="cols">
+    <div class="note">
+      <h3>התחברות ושמירת מצב</h3>
+      <ul>
+        <li>שומרים את ה-token ב-localStorage.</li>
+        <li>בטעינת האפליקציה, אם יש token: <code>GET /auth/me</code>. אם חוזר 401, מוחקים ומעבירים ל-/login.</li>
+        <li>התפקיד נלקח מ-<code>user.role</code> שחזר מהשרת.</li>
+        <li>התנתקות = מחיקת ה-token בקליינט. אין endpoint לזה.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>קריאות לשרת</h3>
+      <ul>
+        <li>כתובת השרת במשתנה סביבה: <code>VITE_API_URL</code>.</li>
+        <li>מקום אחד שמוסיף את <code>Authorization</code> לכל בקשה.</li>
+        <li>כל תגובת 401 מכל מקום: התנתקות ומעבר ל-/login.</li>
+        <li>ב-Render הבקשה הראשונה יכולה לקחת כחצי דקה. כדאי מצב טעינה.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>הגנה על מסכים</h3>
+      <ul>
+        <li>מסך מוגן אחד שבודק "מחובר", ואחד שבודק גם תפקיד.</li>
+        <li>תפריט שונה ל-User ול-Admin.</li>
+        <li>השרת בודק הרשאות בכל מקרה. ההסתרה בקליינט היא רק לחוויית משתמש.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Types -->
+<section id="types">
+  <span class="eyebrow">חוזה ה-API</span>
+  <h2>טיפוסי TypeScript לתשובות השרת</h2>
+  <p>המבנים המדויקים שהשרת מחזיר. אפשר להעתיק לקובץ <code>types.ts</code> בקליינט. תאריכים מגיעים כמחרוזת ISO.</p>
+<pre>export type Role = 'User' | 'Admin';
+export type LostReportStatus = 'Open' | 'Returned';
+export type FoundItemStatus = 'Available' | 'Returned';
+export type OwnershipRequestStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface User { id: number; fullName: string; email: string; role: Role; createdAt: string }
+export interface AuthResponse { token: string; user: User }
+
+export interface Lookup { id: number; name: string }
+export interface Lookups { categories: Lookup[]; colors: Lookup[]; locations: Lookup[] }
+export type LookupType = 'categories' | 'colors' | 'locations';
+
+export interface Page&lt;T&gt; { items: T[]; total: number; page: number; pageSize: number }
+
+export interface LostReport {
+  id: number; title: string; description: string;
+  category: Lookup; color: Lookup; location: Lookup;
+  lostDate: string; status: LostReportStatus; createdAt: string;
+  owner: { id: number; fullName: string };
+}
+
+export interface FoundItem {
+  id: number; title: string; description: string;
+  category: Lookup; color: Lookup; location: Lookup;
+  foundDate: string; verificationQuestion: string;
+  status: FoundItemStatus; createdAt: string;
+  verificationAnswer?: string;            // Admin only
+}
+
+export interface Match {
+  foundItem: FoundItem; score: number;
+  breakdown: { category: boolean; color: boolean; location: boolean };
+}
+
+export interface OwnershipRequest {
+  id: number; status: OwnershipRequestStatus;
+  verificationQuestion: string; answer: string;
+  rejectionReason: string | null; reviewedAt: string | null; createdAt: string;
+  lostReport: { id: number; title: string; status: LostReportStatus };
+  foundItem: { id: number; title: string; status: FoundItemStatus };
+  correctAnswer?: string;                                 // Admin only
+  user?: { id: number; fullName: string; email: string }; // Admin only
+}
+
+// Bodies the client sends
+export interface LostReportInput { title: string; description: string; categoryId: number; colorId: number; locationId: number; lostDate: string }
+export interface FoundItemInput extends Omit&lt;LostReportInput, 'lostDate'&gt; { foundDate: string; verificationQuestion: string; verificationAnswer: string }
+export interface CreateOwnershipRequestInput { lostReportId: number; foundItemId: number; answer: string }
+
+export interface ApiError { error: { code: string; message: string; details?: { path: string; message: string }[] } }</pre>
+</section>
+
+<!-- 7. Errors -->
+<section id="errors">
+  <span class="eyebrow">שגיאות</span>
+  <h2>מה הקליינט עושה עם כל שגיאה</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Status</th><th>מתי</th><th>מה מציגים בממשק</th></tr></thead>
+      <tbody>
+        <tr><td class="m">400</td><td>שדה חסר, לא תקין, או שדה מיותר</td><td>הודעה ליד כל שדה לפי <code>details[].path</code></td></tr>
+        <tr><td class="m">401</td><td>אין token, פג תוקף, או סיסמה שגויה</td><td>בטופס התחברות: "אימייל או סיסמה שגויים". בכל מקום אחר: התנתקות ומעבר ל-/login</td></tr>
+        <tr><td class="m">403</td><td>פעולה שלא מתאימה לתפקיד</td><td>"אין לך הרשאה לפעולה הזו". בדרך כלל לא יקרה אם מסתירים כפתורים</td></tr>
+        <tr><td class="m">404</td><td>לא קיים, או שייך למשתמש אחר</td><td>מסך "לא נמצא" עם קישור חזרה</td></tr>
+        <tr><td class="m">409</td><td>התנגשות: אימייל תפוס, בקשה כפולה, פריט שכבר הוחזר, ערך עזר בשימוש</td><td>מציגים את <code>error.message</code> ומרעננים את הנתונים</td></tr>
+        <tr><td class="m">429</td><td>יותר מדי ניסיונות התחברות</td><td>"יותר מדי ניסיונות. נסו שוב בעוד כמה דקות"</td></tr>
+        <tr><td class="m">500</td><td>תקלה בשרת</td><td>"משהו השתבש. נסו שוב"</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function(){
+  var buttons = document.querySelectorAll('.filter button');
+  var cards = document.querySelectorAll('.screen');
+  buttons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var f = btn.getAttribute('data-f');
+      buttons.forEach(function(b){ b.setAttribute('aria-pressed', String(b === btn)); });
+      cards.forEach(function(c){
+        var r = c.getAttribute('data-role');
+        c.hidden = !(f === 'all' || r === f || r === 'any');
+      });
+    });
+  });
+})();
+</script>

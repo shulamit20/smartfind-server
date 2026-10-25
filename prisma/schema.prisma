@@ -1,0 +1,142 @@
+// SmartFind database schema.
+// After changing this file run: npm run db:migrate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Status values (the single source of truth for statuses) ----------
+
+enum Role {
+  User
+  Admin
+}
+
+enum LostReportStatus {
+  Open
+  Returned
+}
+
+enum FoundItemStatus {
+  Available
+  Returned
+}
+
+enum OwnershipRequestStatus {
+  Pending
+  Approved
+  Rejected
+}
+
+// ---------- Users ----------
+
+model User {
+  id           Int      @id @default(autoincrement())
+  fullName     String
+  email        String   @unique // always stored lowercase
+  passwordHash String
+  role         Role     @default(User)
+  createdAt    DateTime @default(now())
+
+  lostReports       LostReport[]
+  ownershipRequests OwnershipRequest[]
+}
+
+// ---------- Lookup tables (values can be added without code changes) ----------
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  lostReports LostReport[]
+  foundItems  FoundItem[]
+}
+
+model Color {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  lostReports LostReport[]
+  foundItems  FoundItem[]
+}
+
+model Location {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  lostReports LostReport[]
+  foundItems  FoundItem[]
+}
+
+// ---------- Main entities ----------
+
+model LostReport {
+  id          Int              @id @default(autoincrement())
+  userId      Int
+  title       String
+  description String
+  categoryId  Int
+  colorId     Int
+  locationId  Int
+  lostDate    DateTime
+  status      LostReportStatus @default(Open)
+  createdAt   DateTime         @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+  color    Color    @relation(fields: [colorId], references: [id])
+  location Location @relation(fields: [locationId], references: [id])
+
+  ownershipRequests OwnershipRequest[]
+
+  @@index([userId])
+}
+
+model FoundItem {
+  id                   Int             @id @default(autoincrement())
+  title                String
+  description          String // public, general description
+  categoryId           Int
+  colorId              Int
+  locationId           Int
+  foundDate            DateTime
+  verificationQuestion String
+  verificationAnswer   String // HIDDEN – only ever sent to admins
+  status               FoundItemStatus @default(Available)
+  createdAt            DateTime        @default(now())
+
+  category Category @relation(fields: [categoryId], references: [id])
+  color    Color    @relation(fields: [colorId], references: [id])
+  location Location @relation(fields: [locationId], references: [id])
+
+  ownershipRequests OwnershipRequest[]
+
+  @@index([status])
+}
+
+model OwnershipRequest {
+  id              Int                    @id @default(autoincrement())
+  userId          Int
+  lostReportId    Int
+  foundItemId     Int
+  answer          String // the user's answer to the verification question
+  status          OwnershipRequestStatus @default(Pending)
+  rejectionReason String? // required when Rejected, otherwise null
+  reviewedAt      DateTime?
+  createdAt       DateTime               @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+  lostReport LostReport @relation(fields: [lostReportId], references: [id])
+  foundItem  FoundItem  @relation(fields: [foundItemId], references: [id])
+
+  @@index([userId])
+  @@index([foundItemId, status])
+}
