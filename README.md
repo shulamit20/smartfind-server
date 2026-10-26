@@ -72,31 +72,33 @@ npm run dev
 
 ## 2. העלאה ל-Render
 
+מסד הנתונים נמצא ב-**Neon** (PostgreSQL), והשרת רץ ב-Render.
+
 ### אפשרות א' – Blueprint (הכי פשוט)
 
 1. מעלים את הפרויקט ל-GitHub. `node_modules` ו-`.env` לא עולים, כי הם ב-`.gitignore`.
-2. ב-Render: **New → Blueprint** ובוחרים את ה-repository. Render קורא את `render.yaml` ויוצר:
-   - מסד נתונים PostgreSQL בשם `smartfind-db`
-   - שירות web בשם `smartfind-server`, שמחובר אוטומטית למסד הנתונים
-3. Render יבקש למלא את המשתנים שמסומנים `sync: false`:
+2. ב-Neon יוצרים מסד נתונים ומעתיקים את כתובת החיבור **הישירה** (בלי `-pooler` בשם השרת, עם `?sslmode=require`).
+3. ב-Render: **New → Blueprint** ובוחרים את ה-repository. Render קורא את `render.yaml` ויוצר שירות web בשם `smartfind-server`.
+4. Render יבקש למלא את המשתנים שמסומנים `sync: false`:
+   - `DATABASE_URL`: כתובת החיבור של Neon מסעיף 2.
    - `CLIENT_ORIGIN`: כתובת הקליינט ב-Render, למשל `https://smartfind-client.onrender.com`. אם הקליינט עוד לא קיים, אפשר לשים זמנית `http://localhost:5173` ולעדכן אחר כך.
-   - `ADMIN_EMAIL`, `ADMIN_PASSWORD`: פרטי חשבון האדמין.
-4. בכל הפעלה השרת מריץ `npm run start:render`, כלומר מיגרציות, אחר כך seed (בטוח להרצה חוזרת), ואז את השרת.
+   - `ADMIN_EMAIL`, `ADMIN_PASSWORD`: פרטי חשבון האדמין. הסיסמה מתעדכנת לפי המשתנה בכל הפעלה.
+5. בכל הפעלה השרת מריץ `npm run start:render`, כלומר מיגרציות, אחר כך seed (בטוח להרצה חוזרת, לא מוחק כלום), ואז את השרת. `SEED_SAMPLE_DATA="true"` ב-`render.yaml` מוסיף גם חפצים ומשתמש דמו.
 5. בודקים שהכול עובד:
    - `https://<שם-השירות>.onrender.com/api/health` מחזיר `{"status":"ok"}`
    - `https://<שם-השירות>.onrender.com/api/docs` מציג את Swagger
 
 ### אפשרות ב' – ידנית
 
-1. **New → PostgreSQL**, ואחרי שנוצר מעתיקים את ה-**Internal Database URL**.
+1. ב-Neon יוצרים מסד נתונים ומעתיקים את כתובת החיבור הישירה.
 2. **New → Web Service**, ובוחרים את ה-repository:
    - Build Command: `npm install --include=dev && npm run build`
    - Start Command: `npm run start:render`
-   - Environment: `DATABASE_URL` (הכתובת מסעיף 1), `JWT_SECRET` (מחרוזת אקראית ארוכה), `JWT_EXPIRES_IN=1d`, `CLIENT_ORIGIN`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `NODE_ENV=production`
+   - Environment: `DATABASE_URL` (הכתובת מסעיף 1), `JWT_SECRET` (מחרוזת אקראית ארוכה), `JWT_EXPIRES_IN=1d`, `CLIENT_ORIGIN`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `NODE_ENV=production`, `SEED_SAMPLE_DATA` (`true` או `false`)
 
 **שימו לב:**
 - בתוכנית החינמית השרת "נרדם" אחרי זמן בלי שימוש, והבקשה הראשונה אחרי זה לוקחת כחצי דקה.
-- מסד נתונים חינמי ב-Render מוגבל בזמן. כדאי לבדוק בדשבורד מתי הוא פג.
+- גם מסד הנתונים ב-Neon "נרדם" בתוכנית החינמית, ומתעורר לבד בבקשה הבאה.
 - ב-React מגדירים את כתובת ה-API כמשתנה סביבה (למשל `VITE_API_URL`), כדי שיהיה קל להחליף בין localhost ל-Render.
 
 ---
