@@ -65,7 +65,8 @@ registry.registerPath({
   path: '/found-items/{id}',
   tags,
   summary: 'Delete a found item (Admin)',
-  description: 'Returned items cannot be deleted (409). Also deletes the item’s ownership requests.',
+  description:
+    'Returned items and items with pending ownership requests cannot be deleted (409). Also deletes the item’s rejected ownership requests.',
   security: secured,
   request: { params: idParams },
   responses: {

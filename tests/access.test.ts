@@ -342,6 +342,25 @@ describe('ownership requests', () => {
     expect(mine.body.rejectionReason).toBe('The answer is wrong');
   });
 
+  it('an item with a pending request cannot be deleted until the request is reviewed (409)', async () => {
+    const itemId = await createFoundItem('Pending delete test item');
+    const reportId = await createLostReport(aliceToken);
+    const created = await request(app)
+      .post('/api/ownership-requests')
+      .set(auth(aliceToken))
+      .send({ lostReportId: reportId, foundItemId: itemId, answer: 'Green' });
+
+    const blocked = await request(app).delete(`/api/found-items/${itemId}`).set(auth(adminToken));
+    expect(blocked.status).toBe(409);
+
+    await request(app)
+      .patch(`/api/ownership-requests/${created.body.id}/reject`)
+      .set(auth(adminToken))
+      .send({ rejectionReason: 'The answer is wrong' });
+    const removed = await request(app).delete(`/api/found-items/${itemId}`).set(auth(adminToken));
+    expect(removed.status).toBe(204);
+  });
+
   it('approval returns the item and report, and rejects other pending requests', async () => {
     const itemId = await createFoundItem('Approval test item');
     const aliceReport = await createLostReport(aliceToken);

@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { conflict, notFound } from '../../lib/errors';
 import { paginated, toSkipTake } from '../../lib/pagination';
-import { FoundItemStatus, Role } from '../../config/constants';
+import { FoundItemStatus, OwnershipRequestStatus, Role } from '../../config/constants';
 import { lookupInclude } from '../lookups/lookups.mapper';
 import { assertLookupsExist } from '../lookups/lookups.service';
 import { toAdminFoundItem, toFoundItemDto } from './foundItems.mapper';
@@ -67,8 +67,14 @@ export async function remove(id: number) {
   if (existing.status === FoundItemStatus.Returned) {
     throw conflict('A returned item cannot be deleted');
   }
+  const pending = await prisma.ownershipRequest.count({
+    where: { foundItemId: id, status: OwnershipRequestStatus.Pending },
+  });
+  if (pending > 0) {
+    throw conflict('An item with pending ownership requests cannot be deleted');
+  }
 
-  // Delete the item together with all its ownership requests (pending and rejected)
+  // Delete the item together with its (rejected) ownership requests
   await prisma.$transaction([
     prisma.ownershipRequest.deleteMany({ where: { foundItemId: id } }),
     prisma.foundItem.delete({ where: { id } }),
